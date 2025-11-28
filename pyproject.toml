@@ -10,27 +10,25 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "ipykernel>=7.1.0",
-    "jinja2>=3.1.6",
     "jupyter>=1.1.1",
-    "pre-commit>=4.5.0",
-    "pytest>=9.0.1",
-    "qkeras-v3==1.0.3",
+    "matplotlib>=3.10.7",
+    "seaborn>=0.13.2",
+    "tensorflow==2.12.0",
+    "QKeras @ git+https://github.com/google/qkeras.git@78ea90fc381fef23faa4db0e1d88bd1173c1c644"
 ]
-
-[tool.uv]
-index-url = "https://test.pypi.org/simple/"
-extra-index-url = ["https://pypi.org/simple"]
-
-[tool.black]
-line-length = 125
-skip-string-normalization = true
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.5.0",
+    "jinja2>=3.1.6",
+    "pytest>=9.0.1",
+]
 
 [tool.ruff]
 target-version = "py310"
 
 line-length = 125
 indent-width = 4
-exclude = [ "hls4ml/", "quantized-gravnet/" ]
+exclude = [ "hls4ml/" ]
 
 format.quote-style = "single"
 format.skip-magic-trailing-comma = false
@@ -48,12 +46,22 @@ norecursedirs = [
     "hls4ml",
 ]
 python_files = "test_*.py generate_test_vectors.py"
-pythonpath = [
-    "quantized-gravnet",
-]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["utils*", "hls4ml_garnet_lite*"]
 exclude = ["tests*", "scripts*", "notebooks*", "data*", "hls4ml"]
 namespaces = false
+
+[tool.uv.workspace]
+members = [
+    ".",
+]
+
+[tool.uv.sources]
+hls4ml-garnet-lite = { workspace = true, editable = true }
+
+[dependency-groups]
+dev = [
+    "hls4ml-garnet-lite",
+]

@@ -1,0 +1,23 @@
+from dataclasses import dataclass
+from typing import Union
+
+import numpy as np
+import tensorflow as tf
+
+
+@dataclass
+class TestVectorBase:
+    name: str
+    expected_result: Union[np.ndarray, tf.Tensor, None]
+
+    def __post_init__(self):
+        """Automatically convert all tf.Tensors to np.ndarray"""
+        for field_name, value in self.__dict__.items():
+            if hasattr(value, 'numpy'):
+                setattr(self, field_name, value.numpy())
+
+
+@dataclass
+class GarnetLayerTestVector(TestVectorBase):
+    encoded_features: Union[np.ndarray, tf.Tensor]
+    aggregated_distances: Union[np.ndarray, tf.Tensor]
