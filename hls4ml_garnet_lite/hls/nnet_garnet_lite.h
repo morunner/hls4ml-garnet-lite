@@ -8,7 +8,7 @@ namespace nnet {
 
 struct garnetlayer_config {
     static const unsigned V = 128;
-    static const unsigned V_nbits = 128;
+    static const unsigned V_nbits = 7;
     static const unsigned S = 8;
     static const unsigned N = 16;
     static const unsigned exp_table_size = 32;
@@ -18,6 +18,7 @@ struct garnetlayer_config {
 inline float garnet_exp_fcn_float(float input) { return std::exp(input); }
 
 template <class data_T, class exp_table_idx_T, typename CONFIG_T> inline exp_table_idx_T garnet_idx_from_real_val(data_T x) {
+#pragma HLS INLINE
     if (x < 0)
         x = -x;
 
@@ -46,6 +47,7 @@ template <class exp_table_T, typename CONFIG_T> void garnet_init_exp_table(exp_t
 }
 
 template <class res_T, typename CONFIG_T> res_T garnetlayer_acc_tree(res_T data[CONFIG_T::V]) {
+#pragma HLS INLINE
     int D_tree = CONFIG_T::V_nbits; // Include root node
     int W_tree = CONFIG_T::V;
     int w_current = W_tree / 2;
@@ -62,7 +64,7 @@ InitAccBuffer:
 
 AccTreeDepth:
     for (int d = 0; d < D_tree; d++) {
-#pragma HLS PIPELINE II = 1
+#pragma HLS UNROLL
     AccTreeWidth:
         for (int w = 0; w < W_tree / 2; w++) {
 #pragma HLS UNROLL
@@ -79,8 +81,25 @@ AccTreeDepth:
 }
 
 template <class input1_T, class input2_T, class res_T, class exp_table_T, class exp_table_idx_T, typename CONFIG_T>
-void garnet_main_loop(input1_T input1[CONFIG_T::V * CONFIG_T::N], input2_T input2[CONFIG_T::V * CONFIG_T::S],
-                      exp_table_T exp_table[CONFIG_T::exp_table_size], res_T res[CONFIG_T::S * CONFIG_T::N]) {
+void garnetlayer(input1_T input1[CONFIG_T::V * CONFIG_T::N], input2_T input2[CONFIG_T::V * CONFIG_T::S],
+                 res_T res[CONFIG_T::S * CONFIG_T::N]) {
+#pragma HLS ARRAY_PARTITION variable = input1 type = cyclic factor = CONFIG_T::V
+#pragma HLS ARRAY_PARTITION variable = input2 type = cyclic factor = CONFIG_T::S
+#pragma HLS ARRAY_PARTITION variable = res type = block factor = CONFIG_T::S
+
+#ifdef __HLS_SYN__
+    bool initialized = false;
+    exp_table_T exp_table[CONFIG_T::exp_table_size];
+#else
+    static bool initialized = false;
+    static exp_table_T exp_table[CONFIG_T::exp_table_size];
+#endif
+
+    if (!initialized) {
+        garnet_init_exp_table<exp_table_T, CONFIG_T>(exp_table);
+        initialized = true;
+    }
+
 Aggregators:
     for (int s = 0; s < CONFIG_T::S; s++) {
 #pragma HLS PIPELINE II = 1
@@ -104,34 +123,12 @@ Aggregators:
         InitializeBuffers:
             for (int v = 0; v < CONFIG_T::V; v++) {
 #pragma HLS UNROLL
-                feature_buf[v] = (res_T)(input1[v * CONFIG_T::N + n] * weight_buf[v]);
+                feature_buf[v] = input1[v * CONFIG_T::N + n] * weight_buf[v];
             }
             res_T h = garnetlayer_acc_tree<res_T, CONFIG_T>(feature_buf);
             res[s * CONFIG_T::N + n] = h * weighted_features;
         }
     }
-}
-
-template <class input1_T, class input2_T, class res_T, class exp_table_T, class exp_table_idx_T, typename CONFIG_T>
-void garnetlayer(input1_T input1[CONFIG_T::V * CONFIG_T::N], input2_T input2[CONFIG_T::V * CONFIG_T::S],
-                 res_T res[CONFIG_T::S * CONFIG_T::N]) {
-#pragma HLS ARRAY_PARTITION variable = input1 type = cyclic factor = CONFIG_T::N
-#pragma HLS ARRAY_PARTITION variable = input2 type = cyclic factor = CONFIG_T::S
-#pragma HLS ARRAY_PARTITION variable = res type = block factor = CONFIG_T::S
-
-#ifdef __HLS_SYN__
-    bool initialized = false;
-    exp_table_T exp_table[CONFIG_T::exp_table_size];
-#else
-    static bool initialized = false;
-    static exp_table_T exp_table[CONFIG_T::exp_table_size];
-#endif
-
-    if (!initialized) {
-        garnet_init_exp_table<exp_table_T, CONFIG_T>(exp_table);
-        initialized = true;
-    }
-    garnet_main_loop<input1_T, input2_T, res_T, exp_table_T, exp_table_idx_T, CONFIG_T>(input1, input2, exp_table, res);
 }
 
 } // namespace nnet
