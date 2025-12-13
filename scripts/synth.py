@@ -7,18 +7,23 @@ from qkeras.utils import _add_supported_quantized_objects
 import hls4ml
 from hls4ml_garnet_lite.hls4ml_extension.garnet_lite import HGarNetLayer
 from hls4ml_garnet_lite.hls4ml_extension.garnet_lite_parser import parse_garnet_layer
-from hls4ml_garnet_lite.hls4ml_extension.garnet_lite_template import GarNetLayerConfigTemplate, GarNetLayerFunctionTemplate
+from hls4ml_garnet_lite.hls4ml_extension.garnet_lite_template import (
+    GarNetLayerConfigTemplate,
+    GarNetLayerFunctionTemplate,
+)
 from hls4ml_garnet_lite.keras_model.garnet_lite import GarNetLayer
 from utils.files import hls4ml_out_path, model_path, project_root
-from utils.hls_config import set_garnet_lite_hls_config
+from utils.hls_config import get_build_opts, set_converter_opts, set_garnet_lite_hls_config
 from utils.training import regression_loss
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog='SynthGarNetLite', description='Synthesize GarNet Lite model with hls4ml')
     parser.add_argument('-vhls', '--vitis_hls_path')
+    parser.add_argument('-viv', '--vivado_path', default='')  # Optional
     parser.add_argument('-n', '--project_name')
     parser.add_argument('-m', '--model_filename')
+    parser.add_argument('-b', '--backend', default='Vitis')
 
     return parser.parse_args()
 
@@ -26,6 +31,7 @@ def parse_args() -> argparse.Namespace:
 def main():
     args = parse_args()
     os.environ['PATH'] = args.vitis_hls_path + 'bin:' + os.environ['PATH']
+    os.environ['PATH'] = args.vivado_path + 'bin:' + os.environ['PATH']
 
     co = {}
     _add_supported_quantized_objects(co)
@@ -37,31 +43,30 @@ def main():
     hls4ml.converters.register_keras_v2_layer_handler('GarNetLayer', parse_garnet_layer)
     hls4ml.model.layers.register_layer('GarNetLayer', HGarNetLayer)
 
-    backend = hls4ml.backends.get_backend('Vitis')
+    backend = hls4ml.backends.get_backend(args.backend)
     backend.register_template(GarNetLayerConfigTemplate)
     backend.register_template(GarNetLayerFunctionTemplate)
     backend.register_source(project_root / 'hls4ml_garnet_lite' / 'hls' / 'nnet_garnet_lite.h')
 
     hls_config = hls4ml.utils.config_from_keras_model(
-        keras_model, granularity='name', max_precision='ap_fixed<16,8,AP_RND,AP_SAT>', backend='Vitis'
+        keras_model, granularity='name', max_precision='ap_fixed<16,8,AP_RND,AP_SAT>'
     )
     set_garnet_lite_hls_config(hls_config)
 
-    hls_model = hls4ml.converters.convert_from_keras_model(
-        keras_model,
-        hls_config=hls_config,
-        backend='Vitis',
-        output_dir=str(hls4ml_out_path / args.project_name),
-        project_name=args.project_name,
-    )
+    converter_opts = {
+        'model': keras_model,
+        'hls_config': hls_config,
+        'backend': args.backend,
+        'output_dir': str(hls4ml_out_path / args.project_name),
+        'project_name': args.project_name,
+    }
+    set_converter_opts(converter_opts, args.backend)
+    build_opts = get_build_opts(args.backend)
+
+    hls_model = hls4ml.converters.convert_from_keras_model(**converter_opts)
     hls_model.compile()
-    hls_model.build(
-        csim=True,
-        synth=True,
-        cosim=True,
-        validation=True,
-        vsynth=True,
-    )
+
+    hls_model.build(**build_opts)
 
 
 if __name__ == '__main__':
