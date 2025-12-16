@@ -8,6 +8,7 @@ def set_garnet_lite_hls_config(hls_config: dict) -> dict:
     hls_config['LayerName']['garnet']['Precision']['exp_table'] = 'ap_ufixed<16,0>'
     hls_config['LayerName']['garnet']['ExponentialTable']['ScaleFactor'] = 2
     hls_config['LayerName']['garnet']['ExponentialTable']['Resolution'] = 16
+    hls_config['LayerName']['garnet']['ReuseFactor'] = 8
 
     for layer in hls_config['LayerName'].keys():
         if layer != 'garnet':

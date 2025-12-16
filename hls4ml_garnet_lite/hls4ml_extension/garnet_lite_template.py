@@ -10,6 +10,7 @@ static const unsigned S = {S};
 static const unsigned N = {N};
 static const unsigned exp_table_size = {exp_table_size};
 static const unsigned exp_table_indexing_shmt = {exp_table_indexing_shmt};
+static const unsigned reuse = {reuse};
 }};\n"""
 
 garnetlayer_function_template = (
@@ -36,6 +37,12 @@ class GarNetLayerConfigTemplate(LayerConfigTemplate):
 
         params['exp_table_size'] = node.get_attr('exp_table_size')
         params['exp_table_indexing_shmt'] = node.get_attr('exp_table_indexing_shmt')
+
+        if params['reuse'] > params['N']:
+            raise ValueError(
+                'GarNet currently only supports a ReuseFactor which is smaller than or equal to the number of encoded '
+                f'features per vertex. You have ReuseFactor={params["reuse"]}, which is larger than N={params["N"]}.'
+            )
 
         return self.template.format(**params)
 

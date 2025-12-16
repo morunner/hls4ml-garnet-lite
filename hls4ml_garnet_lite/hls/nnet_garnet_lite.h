@@ -13,6 +13,7 @@ struct garnetlayer_config {
     static const unsigned N = 16;
     static const unsigned exp_table_size = 32;
     static const unsigned exp_table_indexing_shmt = 4;
+    static const unsigned reuse = 1;
 };
 
 inline float garnet_exp_fcn_float(float input) { return std::exp(input); }
@@ -81,33 +82,42 @@ AccTreeDepth:
 template <class input1_T, class input2_T, class res_T, class exp_table_T, class exp_table_idx_T, typename CONFIG_T>
 void garnet_main_loop(input1_T input1[CONFIG_T::V * CONFIG_T::N], input2_T input2[CONFIG_T::V * CONFIG_T::S],
                       exp_table_T exp_table[CONFIG_T::exp_table_size], res_T res[CONFIG_T::S * CONFIG_T::N]) {
-Aggregators:
-    for (int s = 0; s < CONFIG_T::S; s++) {
-#pragma HLS PIPELINE II = 1
-        res_T feature_buf[CONFIG_T::V];
-        res_T weight_buf[CONFIG_T::V];
-#pragma HLS ARRAY_PARTITION variable = feature_buf complete
+    constexpr unsigned int REUSE = CONFIG_T::reuse;
+    constexpr unsigned int BLOCK_SIZE = CONFIG_T::N / REUSE;
+
+    res_T weight_buf[CONFIG_T::V];
 #pragma HLS ARRAY_PARTITION variable = weight_buf complete
+    res_T weighted_features_cache;
 
-    InitializeWeights:
-        for (int v = 0; v < CONFIG_T::V; v++) {
+    for (int i = 0; i < CONFIG_T::S * REUSE; i++) {
+#pragma HLS PIPELINE II = 1
+        int s = i / REUSE;
+        int r = i % REUSE;
+
+        if (r == 0) {
+            for (int v = 0; v < CONFIG_T::V; v++) {
 #pragma HLS UNROLL
-            exp_table_idx_T idx = garnet_idx_from_real_val<input2_T, exp_table_idx_T, CONFIG_T>(input2[v * CONFIG_T::S + s]);
-            exp_table_T w = exp_table[idx];
-            weight_buf[v] = w;
+                exp_table_idx_T idx =
+                    garnet_idx_from_real_val<input2_T, exp_table_idx_T, CONFIG_T>(input2[v * CONFIG_T::S + s]);
+                weight_buf[v] = exp_table[idx];
+            }
+            weighted_features_cache = garnetlayer_acc_tree<res_T, CONFIG_T>(weight_buf);
         }
-        res_T weighted_features = garnetlayer_acc_tree<res_T, CONFIG_T>(weight_buf);
 
-    Features:
-        for (int n = 0; n < CONFIG_T::N; n++) {
+        for (int n_local = 0; n_local < BLOCK_SIZE; n_local++) {
 #pragma HLS UNROLL
-        InitializeBuffers:
+
+            int n = r * BLOCK_SIZE + n_local;
+
+            res_T feature_buf[CONFIG_T::V];
+#pragma HLS ARRAY_PARTITION variable = feature_buf complete
+
             for (int v = 0; v < CONFIG_T::V; v++) {
 #pragma HLS UNROLL
                 feature_buf[v] = (res_T)(input1[v * CONFIG_T::N + n] * weight_buf[v]);
             }
             res_T h = garnetlayer_acc_tree<res_T, CONFIG_T>(feature_buf);
-            res[s * CONFIG_T::N + n] = h * weighted_features;
+            res[s * CONFIG_T::N + n] = h * weighted_features_cache;
         }
     }
 }

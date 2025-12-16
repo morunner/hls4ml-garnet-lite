@@ -8,6 +8,7 @@ class GarNetConfig:
     V_nbits: int = field(init=False)
     S: int = 4
     N: int = 8
+    reuse: int = 1
     exp_table_scale_factor: int = 2
     exp_table_resolution: int = 16
     exp_table_size: int = field(init=False)

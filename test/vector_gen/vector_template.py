@@ -11,6 +11,7 @@ struct garnet_config {
     static const unsigned exp_table_size = {{ garnet_config.exp_table_size }};
     static const unsigned exp_table_size_nbits = {{ garnet_config.exp_table_size_nbits }};
     static const unsigned exp_table_indexing_shmt = {{ garnet_config.exp_table_indexing_shmt }};
+    static const unsigned reuse = {{ garnet_config.reuse }};
 };
 {% for class_name, items in data.items() %}
 struct {{ class_name }} {
