@@ -16,8 +16,8 @@ def recorder():
 
 
 def test_gen_vector_garnet_layer(recorder):
-    encoded_features = tf.random.normal(shape=(gen_config.n_test_vectors, garnet_config.V, garnet_config.N))
-    aggregated_distances = tf.random.normal(shape=(gen_config.n_test_vectors, garnet_config.V, garnet_config.S))
+    encoded_features = tf.random.normal(shape=(gen_config.n_test_vectors, garnet_config.V, garnet_config.N), stddev=40)
+    aggregated_distances = tf.random.normal(shape=(gen_config.n_test_vectors, garnet_config.V, garnet_config.S), stddev=40)
     garnet_layer = GarNetLayer()
 
     # Trigger Keras .build()

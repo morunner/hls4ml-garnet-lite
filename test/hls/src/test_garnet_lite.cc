@@ -6,7 +6,7 @@
 #include <cstddef>
 
 TEST(Hls4mlGarNetTest, garnet_layer) {
-    const double abs_error = 0.1;
+    const double abs_error = 0.01;
     typedef ap_fixed<16, 8> encoded_features_t;
     typedef ap_fixed<16, 8> aggregated_distances_t;
     typedef ap_ufixed<16, 0> exp_table_t;
