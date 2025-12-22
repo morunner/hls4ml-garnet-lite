@@ -14,7 +14,8 @@ dependencies = [
     "matplotlib>=3.10.7",
     "seaborn>=0.13.2",
     "tensorflow==2.12.0",
-    "QKeras @ git+https://github.com/google/qkeras.git@78ea90fc381fef23faa4db0e1d88bd1173c1c644"
+    "QKeras @ git+https://github.com/google/qkeras.git@78ea90fc381fef23faa4db0e1d88bd1173c1c644",
+    "tabulate>=0.9.0",
 ]
 [project.optional-dependencies]
 dev = [
