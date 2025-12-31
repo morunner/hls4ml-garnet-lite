@@ -1,11 +1,11 @@
 import argparse
 
 from keras.callbacks import ModelCheckpoint
-
-from hls4ml_garnet_lite.keras_model.garnet_lite import QGarNetFactory
 from utils.data import load_data
 from utils.files import model_path
 from utils.training import garnet_train_config as train_config
+
+from hls4ml_garnet_lite.keras_model.garnet_lite import QGarNetFactory
 
 
 def parse_args():

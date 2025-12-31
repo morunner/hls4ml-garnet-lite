@@ -24,7 +24,7 @@ class GarNetTrainConfig:
     epochs: int = 120
     prune_epochs: int = 30
 
-    optimizer: Optimizer = field(default_factory=lambda: Adam(learning_rate=0.0005))
+    optimizer: Optimizer = field(default_factory=lambda: Adam(learning_rate=0.001))
 
     loss_params: Dict[KerasLossFunction, Union[str, KerasLossFunction]] = field(
         default_factory=lambda: {

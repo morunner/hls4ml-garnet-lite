@@ -4,14 +4,22 @@ from keras.models import Model, load_model
 from qkeras.utils import _add_supported_quantized_objects
 from sklearn.metrics import roc_auc_score
 from tabulate import tabulate
-
-from hls4ml_garnet_lite.keras_model.garnet_lite import GarNetLayer
 from utils.data import load_data
 from utils.evaluation import response_rmse
 from utils.files import model_path
 from utils.training import regression_loss
 
-MODELS = ['garnet_8_0', 'garnet_8_0_pruned', 'garnet_lite_8_0', 'garnet_lite_8_0_pruned']
+from hls4ml.contrib.garnet import GarNet
+from hls4ml_garnet_lite.keras_model.garnet_lite import GarNetLayer
+
+MODELS = [
+    'original_garnet_8_0',
+    'original_garnet_lite_8_0',
+    'garnet_8_0',
+    'garnet_8_0_pruned',
+    'garnet_lite_8_0',
+    'garnet_lite_8_0_pruned',
+]
 
 
 def add_model_predictions_to_df(
@@ -36,17 +44,22 @@ def add_model_predictions_to_df(
 
 def main():
     _, _, X_test, y_test = load_data(suffix='baseline_50')
+
+    co = {}
+    _add_supported_quantized_objects(co)
+    co['GarNet'] = GarNet
+    co['GarNetLayer'] = GarNetLayer
     X_test = X_test[0]
+    co['regression_loss'] = regression_loss
 
     df = pd.DataFrame(columns=['model', 'auc', 'rmse'])
     for model in MODELS:
         keras_model_path = str(model_path / f'{model}.keras')
-        co = {}
-        _add_supported_quantized_objects(co)
-        co['GarNetLayer'] = GarNetLayer
-        co['regression_loss'] = regression_loss
         keras_model = load_model(keras_model_path, custom_objects=co)
-        df = add_model_predictions_to_df(keras_model, X_test, y_test, df, model)
+        if 'original' in model:
+            df = add_model_predictions_to_df(keras_model, X_test, y_test, df, model)
+        else:
+            df = add_model_predictions_to_df(keras_model, X_test[0], y_test, df, model)
 
     # Print metrics
     print(tabulate(df.round(3), headers='keys', tablefmt='psql'))

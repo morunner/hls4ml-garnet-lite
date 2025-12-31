@@ -5,13 +5,13 @@ import tensorflow_model_optimization as tfmot
 from keras.layers import Dense
 from keras.models import clone_model, load_model
 from qkeras.utils import _add_supported_quantized_objects
-
-from hls4ml_garnet_lite.keras_model.garnet_lite import GarNetLayer
 from utils.data import load_data
 from utils.files import model_path
 from utils.training import garnet_train_config as gtc
 from utils.training import garnet_train_config as train_config
 from utils.training import regression_loss
+
+from hls4ml_garnet_lite.keras_model.garnet_lite import GarNetLayer
 
 
 def apply_pruning(layer, end_step):

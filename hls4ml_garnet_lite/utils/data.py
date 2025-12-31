@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-from utils.files import dataset_path
+from hls4ml_garnet_lite.utils.files import dataset_path
 
 
 def fetch_garnet_dataset(n_files: int) -> None:

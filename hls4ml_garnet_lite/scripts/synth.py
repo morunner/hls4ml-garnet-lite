@@ -3,6 +3,7 @@ import os
 
 from keras.models import load_model
 from qkeras.utils import _add_supported_quantized_objects
+from sklearn.metrics import roc_auc_score
 
 import hls4ml
 from hls4ml_garnet_lite.hls4ml_extension.garnet_lite import HGarNetLayer
@@ -12,9 +13,11 @@ from hls4ml_garnet_lite.hls4ml_extension.garnet_lite_template import (
     GarNetLayerFunctionTemplate,
 )
 from hls4ml_garnet_lite.keras_model.garnet_lite import GarNetLayer
-from utils.files import hls4ml_out_path, model_path, project_root
-from utils.hls_config import get_build_opts, set_converter_opts, set_garnet_lite_hls_config
-from utils.training import regression_loss
+from hls4ml_garnet_lite.utils.data import load_data
+from hls4ml_garnet_lite.utils.evaluation import garnet_predict, response_rmse
+from hls4ml_garnet_lite.utils.files import hls4ml_out_path, model_path, project_root
+from hls4ml_garnet_lite.utils.hls_config import get_build_opts, set_converter_opts, set_garnet_lite_hls_config
+from hls4ml_garnet_lite.utils.training import regression_loss
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,14 +25,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('-vhls', '--vitis_hls_path')
     parser.add_argument('-viv', '--vivado_path', default='')  # Optional
     parser.add_argument('-n', '--project_name')
+    parser.add_argument('-o', '--output_dir', default='')
     parser.add_argument('-m', '--model_filename')
+    parser.add_argument('-r', '--reuse', type=int)
     parser.add_argument('-b', '--backend', default='Vitis')
 
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
+def run_garnet_synthesis(args: argparse.Namespace):
     os.environ['PATH'] = args.vitis_hls_path + 'bin:' + os.environ['PATH']
     os.environ['PATH'] = args.vivado_path + 'bin:' + os.environ['PATH']
 
@@ -48,16 +52,16 @@ def main():
     backend.register_template(GarNetLayerFunctionTemplate)
     backend.register_source(project_root / 'hls4ml_garnet_lite' / 'hls' / 'nnet_garnet_lite.h')
 
-    hls_config = hls4ml.utils.config_from_keras_model(
-        keras_model, granularity='name', max_precision='ap_fixed<16,8,AP_RND,AP_SAT>'
-    )
-    set_garnet_lite_hls_config(hls_config)
+    hls_config = hls4ml.utils.config_from_keras_model(keras_model, granularity='name', default_reuse_factor=1)
+    set_garnet_lite_hls_config(hls_config=hls_config, garnet_reuse=1)
+    hls_config['LayerName']['q_dense']['ReuseFactor'] = args.reuse
+    hls_config['LayerName']['q_dense_1']['ReuseFactor'] = args.reuse
 
     converter_opts = {
         'model': keras_model,
         'hls_config': hls_config,
         'backend': args.backend,
-        'output_dir': str(hls4ml_out_path / args.project_name),
+        'output_dir': str(hls4ml_out_path / args.output_dir / args.project_name),
         'project_name': args.project_name,
     }
     set_converter_opts(converter_opts, args.backend)
@@ -66,8 +70,19 @@ def main():
     hls_model = hls4ml.converters.convert_from_keras_model(**converter_opts)
     hls_model.compile()
 
+    # Check accuracies
+    _, _, X_test, y_test = load_data(suffix='baseline_1')
+    if 'original' not in args.model_filename:
+        X_test = X_test[0]
+    test_energy_pred_hls, test_pid_pred_hls = garnet_predict(hls_model, X_test)
+    test_energy_pred_hls *= 100
+    test_response_rmse = response_rmse(y_test[0], test_energy_pred_hls)
+    test_auc = roc_auc_score(y_test[1], test_pid_pred_hls)
+    print(f'HLS model RMSE={test_response_rmse:.2f} AUC={test_auc:.2f} for reuse factor {args.reuse}')
+
     hls_model.build(**build_opts)
 
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()
+    run_garnet_synthesis(args)
