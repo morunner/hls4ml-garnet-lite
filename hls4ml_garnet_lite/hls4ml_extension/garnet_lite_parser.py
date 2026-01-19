@@ -9,5 +9,5 @@ def parse_garnet_layer(keras_layer, input_names, input_shapes, data_reader):
     layer['S'] = keras_layer['config']['S']  # Number of aggregators per vertex (hit)
     layer['N'] = keras_layer['config']['N']  # Number of encoded features per vertex
 
-    output_shape = [input_shapes[0][1]]
+    output_shape = [layer['S'] * layer['N']]
     return layer, output_shape
