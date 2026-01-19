@@ -89,12 +89,14 @@ void garnet_main_loop(input1_T input1[CONFIG_T::V * CONFIG_T::N], input2_T input
 #pragma HLS ARRAY_PARTITION variable = weight_buf complete
     res_T weighted_features_cache;
 
+Aggregators:
     for (int i = 0; i < CONFIG_T::S * REUSE; i++) {
-#pragma HLS PIPELINE II = 1
+#pragma HLS PIPELINE II = 1 rewind
         int s = i / REUSE;
         int r = i % REUSE;
 
         if (r == 0) {
+        InitWeights:
             for (int v = 0; v < CONFIG_T::V; v++) {
 #pragma HLS UNROLL
                 exp_table_idx_T idx =
@@ -104,6 +106,7 @@ void garnet_main_loop(input1_T input1[CONFIG_T::V * CONFIG_T::N], input2_T input
             weighted_features_cache = garnetlayer_acc_tree<res_T, CONFIG_T>(weight_buf);
         }
 
+    Features:
         for (int n_local = 0; n_local < BLOCK_SIZE; n_local++) {
 #pragma HLS UNROLL
 
