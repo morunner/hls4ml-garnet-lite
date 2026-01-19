@@ -76,9 +76,9 @@ class GarNetFactory(GarNetFactoryBase):
 class QGarNetFactory(GarNetFactoryBase):
     def __init__(
         self,
-        encoder_units: int = 16,
-        aggregator_units: int = 8,
-        decoder_units: int = 16,
+        encoder_units: int = 8,
+        aggregator_units: int = 4,
+        decoder_units: int = 8,
         precision: Tuple[int, int] = (32, 16),
     ):
         self.init_model(
@@ -111,7 +111,7 @@ class QGarNetFactory(GarNetFactoryBase):
 
 
 class GarNetLayer(Layer):
-    def __init__(self, V: int = 128, S: int = 8, N: int = 4, **kwargs):
+    def __init__(self, V: int = 128, S: int = 4, N: int = 8, **kwargs):
         super().__init__(**kwargs)
         self.V: int = V  # Number of vertices (hits)
         self.S: int = S  # Number of aggregators per vertex (hit)
