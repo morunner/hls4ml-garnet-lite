@@ -180,3 +180,45 @@ class OriginalGarNetFactoryFullyQuantized:
         classes = QActivation(quantized_sigmoid(*self.precision), name='classification')(classes)
 
         return Model(inputs=inputs, outputs=[energies, classes])
+
+
+class OriginalGarNetLiteFactoryFullyQuantized:
+    def __init__(
+        self,
+        encoder_units: int = 16,
+        aggregator_units: int = 8,
+        decoder_units: int = 16,
+        precision: Tuple[int, int] = (32, 16),
+    ):
+        self.encoder_units = encoder_units
+        self.aggregator_units = aggregator_units
+        self.decoder_units = decoder_units
+        self.precision = precision
+
+    def create_keras_model(self):
+        quantizer = quantized_bits(*self.precision, alpha=1)
+
+        x = Input(shape=(128, 4))
+        n = Input(shape=(1,), dtype='uint16')
+        inputs = [x, n]
+
+        v = GarNet(
+            self.aggregator_units,
+            self.encoder_units,
+            self.decoder_units,
+            simplified=True,
+            collapse='mean',
+            input_format='xn',
+            output_activation=None,
+            name='gar_1',
+            quantize_transforms=True,
+            int_bits=self.precision[1],
+            total_bits=self.precision[0],
+        )([x, n])
+        v = QDense(8, kernel_quantizer=quantizer, bias_quantizer=quantizer)(v)
+        v = QActivation(quantized_relu(*self.precision))(v)
+        energies = QDense(1, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='regression')(v)
+        classes = QDense(1, kernel_quantizer=quantizer, bias_quantizer=quantizer)(v)
+        classes = QActivation(quantized_sigmoid(*self.precision), name='classification')(classes)
+
+        return Model(inputs=inputs, outputs=[energies, classes])
