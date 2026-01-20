@@ -82,6 +82,7 @@ AccTreeDepth:
 template <class input1_T, class input2_T, class res_T, class exp_table_T, class exp_table_idx_T, typename CONFIG_T>
 void garnet_main_loop(input1_T input1[CONFIG_T::V * CONFIG_T::N], input2_T input2[CONFIG_T::V * CONFIG_T::S],
                       exp_table_T exp_table[CONFIG_T::exp_table_size], res_T res[CONFIG_T::S * CONFIG_T::N]) {
+#pragma HLS INLINE
     constexpr unsigned int REUSE = CONFIG_T::reuse;
     constexpr unsigned int BLOCK_SIZE = CONFIG_T::N / REUSE;
 
