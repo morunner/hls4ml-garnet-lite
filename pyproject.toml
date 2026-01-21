@@ -68,4 +68,8 @@ hls4ml-garnet-lite = { workspace = true, editable = true }
 dev = [
     "hls4ml-garnet-lite",
     "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
 ]
+
+[tool.setuptools.package-data]
+"hls4ml_garnet_lite" = ["**/*.h"]
