@@ -1,5 +1,5 @@
-#ifndef NNET_GARNET_V2_H_
-#define NNET_GARNET_V2_H_
+#ifndef NNET_GARNET_LITE_H_
+#define NNET_GARNET_LITE_H_
 
 #include "hls_math.h"
 #include "nnet_common.h"
@@ -150,4 +150,4 @@ void garnetlayer(input1_T input1[CONFIG_T::V * CONFIG_T::N], input2_T input2[CON
 
 } // namespace nnet
 
-#endif // NNET_GARNET_V2_H_
+#endif // NNET_GARNET_LITE_H_
