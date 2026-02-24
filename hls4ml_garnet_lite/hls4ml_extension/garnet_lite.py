@@ -13,8 +13,10 @@ class HGarNetLayer(Layer):
         Attribute('exponential_table', value_type=dict, default={'ScaleFactor': 2, 'Resolution': 16}, configurable=True),
         Attribute('exp_table_size', value_type=int),
         Attribute('exp_table_indexing_shmt', value_type=int),
+        Attribute('collapse_mean', value_type=bool),
         TypeAttribute('exp_table', default=FixedPrecisionType(width=16, integer=0, signed=False), configurable=True),
         TypeAttribute('exp_table_idx', default=IntegerPrecisionType(width=4, signed=False)),
+        TypeAttribute('accum', default=FixedPrecisionType(width=16, integer=8, signed=True), configurable=True),
     ]
 
     def initialize(self):
@@ -36,6 +38,8 @@ class HGarNetLayer(Layer):
         self.set_attr('exp_table_idx_t', IntegerPrecisionType(width=exp_table_size_nbits, signed=False))
 
         self._set_type_t('exp_table')
+        self._set_type_t('accum')
 
-        shape = [self.get_attr('V')]
+        out_features = self.get_attr('S') * self.get_attr('N')
+        shape = [out_features] if self.get_attr('collapse_mean', True) else [self.get_attr('V'), out_features]
         self.add_output_variable(shape)

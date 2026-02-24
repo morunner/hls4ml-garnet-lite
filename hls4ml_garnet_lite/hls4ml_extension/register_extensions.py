@@ -1,6 +1,7 @@
 from importlib import resources
 
 import hls4ml
+
 from hls4ml_garnet_lite.hls4ml_extension.garnet_lite import HGarNetLayer
 from hls4ml_garnet_lite.hls4ml_extension.garnet_lite_parser import parse_garnet_layer
 from hls4ml_garnet_lite.hls4ml_extension.garnet_lite_template import GarNetLayerConfigTemplate, GarNetLayerFunctionTemplate
@@ -15,5 +16,12 @@ def register_extensions(backend: str):
     backend.register_template(GarNetLayerFunctionTemplate)
 
     hls_files = resources.files('hls4ml_garnet_lite.hls')
-    with resources.as_file(hls_files / 'nnet_garnet_lite.h') as header_path:
-        backend.register_source(str(header_path))
+    filenames = [
+        'nnet_garnet_lite_common.h',
+        'nnet_garnet_lite.h',
+        'nnet_garnet_lite_stream.h',
+    ]
+
+    for fname in filenames:
+        with resources.as_file(hls_files / fname) as source_path:
+            backend.register_source(str(source_path))

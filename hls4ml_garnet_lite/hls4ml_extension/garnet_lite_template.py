@@ -1,6 +1,6 @@
 import numpy as np
-
 from hls4ml.backends.template import FunctionCallTemplate, LayerConfigTemplate
+
 from hls4ml_garnet_lite.hls4ml_extension.garnet_lite import HGarNetLayer
 
 garnetlayer_config_template = """struct config{index}: nnet::garnetlayer_config {{
@@ -14,11 +14,15 @@ static const unsigned reuse = {reuse};
 }};\n"""
 
 garnetlayer_function_template = (
-    'nnet::garnetlayer<{input1_t}, {input2_t}, {output_t}, {exp_table_t}, {exp_table_idx_t},  '
+    'nnet::garnetlayer<{input1_t}, {input2_t}, {accum_t}, {output_t}, {exp_table_t}, {exp_table_idx_t},  '
     '{config}>({input1}, {input2}, {output});'
 )
 
-garnetlayer_include_list = ['nnet_utils/nnet_garnet_lite.h']
+garnetlayer_include_list = [
+    'nnet_utils/nnet_garnet_lite_common.h',
+    'nnet_utils/nnet_garnet_lite.h',
+    'nnet_utils/nnet_garnet_lite_stream.h',
+]
 
 
 class GarNetLayerConfigTemplate(LayerConfigTemplate):
@@ -63,6 +67,7 @@ class GarNetLayerFunctionTemplate(FunctionCallTemplate):
         output = node.get_output_variable()
         exp_table_t = node.get_attr('exp_table_t')
         exp_table_idx_t = node.get_attr('exp_table_idx_t')
+        accum_t = node.get_attr('accum_t')
 
         # Assign types
         params['input1_t'] = input_encoded_features.type.name
@@ -70,11 +75,11 @@ class GarNetLayerFunctionTemplate(FunctionCallTemplate):
         params['output_t'] = output.type.name
         params['exp_table_t'] = exp_table_t.name
         params['exp_table_idx_t'] = exp_table_idx_t.name
+        params['accum_t'] = accum_t.name
 
         # Assign input and output data args
         params['input1'] = input_encoded_features.name
         params['input2'] = input_aggregated_distances.name
         params['output'] = output.name
-        params['exp_table'] = 'exp_table'
 
         return self.template.format(**params)

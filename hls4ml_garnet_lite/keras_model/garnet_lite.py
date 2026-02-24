@@ -5,7 +5,7 @@ from typing import Tuple
 import keras.backend as K
 import tensorflow as tf
 from keras import Input, Model
-from keras.layers import Activation, Dense, Layer
+from keras.layers import Activation, Dense, GlobalAveragePooling1D, Layer
 from qkeras import (
     QActivation,
     QDense,
@@ -110,12 +110,90 @@ class QGarNetFactory(GarNetFactoryBase):
         self.activation_classification = QActivation(quantized_sigmoid(*precision), name='classification')
 
 
+class QGarNetFactoryStacked(GarNetFactoryBase):
+    def __init__(
+        self,
+        precision: Tuple[int, int] = (32, 16),
+    ):
+        self.init_model(precision=precision)
+
+    def init_model(
+        self,
+        precision: Tuple[int, int] = (32, 16),
+    ):
+        # Currently QGarNet only supports alpha=1 due to scaling issues in HLS
+        quantizer = quantized_bits(*precision, alpha=1)
+
+        self.encoder_1 = QDense(4, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='encoder_1')
+        self.aggregator_1 = QDense(8, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='aggregator_1')
+        self.garnet_1 = GarNetLayer(name='garnet_1', collapse_mean=False)
+        self.decoder_1 = QDense(8, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='decoder_1')
+
+        self.encoder_2 = QDense(4, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='encoder_2')
+        self.aggregator_2 = QDense(8, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='aggregator_2')
+        self.garnet_2 = GarNetLayer(name='garnet_2', collapse_mean=False)
+        self.decoder_2 = QDense(8, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='decoder_2')
+
+        self.encoder_3 = QDense(8, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='encoder_3')
+        self.aggregator_3 = QDense(16, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='aggregator_3')
+        self.garnet_3 = GarNetLayer(name='garnet_3', collapse_mean=False)
+        self.decoder_3 = QDense(16, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='decoder_3')
+
+        self.avg_pool = GlobalAveragePooling1D(name='collapse_mean_pool')
+
+        self.dense_16 = QDense(16, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='dense_16')
+        self.act_16 = QActivation(quantized_relu(*precision), name='act_16')
+
+        self.dense_8 = QDense(8, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='dense_8')
+        self.act_8 = QActivation(quantized_relu(*precision), name='act_8')
+
+        self.dense_regression = QDense(1, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='regression')
+        self.dense_classification = QDense(
+            1, kernel_quantizer=quantizer, bias_quantizer=quantizer, name='classification_dense'
+        )
+        self.activation_classification = QActivation(quantized_sigmoid(*precision), name='classification')
+
+    def create_keras_model(self, vmax=128):
+        hits = Input(shape=(vmax, 4))
+
+        encoded_1 = self.encoder_1(hits)
+        agg_1 = self.aggregator_1(hits)
+        g_1 = self.garnet_1([encoded_1, agg_1])
+        d_1 = self.decoder_1(g_1)
+
+        encoded_2 = self.encoder_2(d_1)
+        agg_2 = self.aggregator_2(d_1)
+        g_2 = self.garnet_2([encoded_2, agg_2])
+        d_2 = self.decoder_2(g_2)
+
+        encoded_3 = self.encoder_3(d_2)
+        agg_3 = self.aggregator_3(d_2)
+        g_3 = self.garnet_3([encoded_3, agg_3])
+        d_3 = self.decoder_3(g_3)
+
+        pooled = self.avg_pool(d_3)
+
+        v = self.dense_16(pooled)
+        v = self.act_16(v)
+
+        v = self.dense_8(v)
+        v = self.act_8(v)
+
+        energies = self.dense_regression(v)
+
+        classes = self.dense_classification(v)
+        classes = self.activation_classification(classes)
+
+        return Model(inputs=hits, outputs=[energies, classes])
+
+
 class GarNetLayer(Layer):
-    def __init__(self, V: int = 128, S: int = 4, N: int = 8, **kwargs):
+    def __init__(self, V: int = 128, S: int = 4, N: int = 8, collapse_mean: bool = True, **kwargs):
         super().__init__(**kwargs)
         self.V: int = V  # Number of vertices (hits)
         self.S: int = S  # Number of aggregators per vertex (hit)
         self.N: int = N  # Number of encoded features per vertex (hit) (coming from the encoder layer)
+        self.collapse_mean = collapse_mean
 
     def build(self, input_shape):
         super().build(input_shape)
@@ -153,7 +231,10 @@ class GarNetLayer(Layer):
         f_av_tilde = w_av * hi_av
         f_av_tilde = K.reshape(f_av_tilde, (-1, self.V, self.S * self.N))
 
-        return tf.reduce_mean(f_av_tilde, axis=1)
+        if self.collapse_mean:
+            return tf.reduce_mean(f_av_tilde, axis=1)
+
+        return f_av_tilde
 
     def get_config(self):
         config = super().get_config()
@@ -162,6 +243,7 @@ class GarNetLayer(Layer):
                 'V': self.V,
                 'S': self.S,
                 'N': self.N,
+                'collapse_mean': self.collapse_mean,
             }
         )
         return config
