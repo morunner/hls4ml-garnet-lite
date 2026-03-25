@@ -38,7 +38,7 @@ template <class exp_table_T, typename CONFIG_T> void garnet_init_exp_table(exp_t
     // Set exp for large distances to zero to give room for optimizations
     table_out[CONFIG_T::exp_table_size - 1] = 0.0f;
 
-    for (unsigned i = 1; i < CONFIG_T::exp_table_size - 1; i++) {
+    for (unsigned i = 0; i < CONFIG_T::exp_table_size - 3; i++) {
 #pragma HLS UNROLL
         float val = (float)((ap_fixed<32, 16>)(i + 1) >> CONFIG_T::exp_table_indexing_shmt);
         exp_table_T exp_x = garnet_exp_fcn_float(-val * val) / (float)CONFIG_T::V;
